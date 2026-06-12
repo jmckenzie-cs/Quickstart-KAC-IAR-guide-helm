@@ -49,5 +49,6 @@ See [`falcon-kac-iar-quickstart.md`](./falcon-kac-iar-quickstart.md) for full pr
 ## Resources
 
 - [CrowdStrike Falcon Helm Charts](https://github.com/CrowdStrike/falcon-helm)
-- [Falcon KAC Documentation](https://falcon.crowdstrike.com/documentation/146/falcon-kubernetes-admission-controller)
-- [Falcon Image Assessment at Runtime](https://falcon.crowdstrike.com/documentation/146/image-assessment-at-runtime)
+- [Falcon Container Sensor Pull Script](https://github.com/CrowdStrike/falcon-scripts)
+- [Falcon Kubernetes Admission Controller — Official Docs](https://docs.crowdstrike.com/access?ft:originId=db127604)
+- [Falcon Image Assessment at Runtime — Official Docs](https://docs.crowdstrike.com/access?ft:originId=tcb77d50)
