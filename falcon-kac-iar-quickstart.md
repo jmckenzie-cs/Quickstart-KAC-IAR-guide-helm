@@ -61,6 +61,124 @@ EKS, EKS Fargate, AKS, GKE, GKE Autopilot, K3s
 
 ---
 
+## Obtaining the Images
+
+Both KAC and IAR are container images hosted on the CrowdStrike registry. You have two options:
+
+| Option | Best For |
+|--------|----------|
+| **Pull directly from CrowdStrike registry at deploy time** | Clusters with outbound internet access to `registry.crowdstrike.com` |
+| **Mirror to a private registry first** | Air-gapped environments, corporate registry policies, or image scanning pipelines |
+
+### API Scopes Required
+
+Create a Falcon API client at **Falcon Console → Support & Resources → API Clients and Keys** with these scopes:
+
+| Scope | Permission |
+|-------|-----------|
+| `Sensor Download` | Read |
+| `Falcon Images Download` | Read |
+
+> This same client can be reused for IAR's runtime credential (`clientID`/`clientSecret`) if you also add the **Falcon Container Image** scope (Read + Write).
+
+---
+
+### Option A: Pull Directly from CrowdStrike Registry
+
+Retrieve the image path and Kubernetes pull token using the `falcon-container-sensor-pull.sh` script from [falcon-scripts](https://github.com/CrowdStrike/falcon-scripts).
+
+**Get the KAC image path (latest unified image):**
+
+```bash
+./falcon-container-sensor-pull.sh \
+  --client-id $FALCON_CLIENT_ID \
+  --client-secret $FALCON_CLIENT_SECRET \
+  --type falcon-kac \
+  --get-image-path
+```
+
+Example output: `registry.crowdstrike.com/falcon-kac/release/falcon-kac:7.33.0-1`
+
+**Get the IAR image path:**
+
+```bash
+./falcon-container-sensor-pull.sh \
+  --client-id $FALCON_CLIENT_ID \
+  --client-secret $FALCON_CLIENT_SECRET \
+  --type falcon-imageanalyzer \
+  --get-image-path
+```
+
+Example output: `registry.crowdstrike.com/falcon-imageanalyzer/release/falcon-imageanalyzer:1.0.24`
+
+**Generate a Kubernetes pull token (base64 docker config):**
+
+```bash
+# KAC pull token
+./falcon-container-sensor-pull.sh \
+  --client-id $FALCON_CLIENT_ID \
+  --client-secret $FALCON_CLIENT_SECRET \
+  --type falcon-kac \
+  --get-pull-token
+
+# IAR pull token
+./falcon-container-sensor-pull.sh \
+  --client-id $FALCON_CLIENT_ID \
+  --client-secret $FALCON_CLIENT_SECRET \
+  --type falcon-imageanalyzer \
+  --get-pull-token
+```
+
+Use the pull token output as `image.registryConfigJSON` in your Helm values.
+
+**List available tags** (to pin a specific version):
+
+```bash
+./falcon-container-sensor-pull.sh \
+  --client-id $FALCON_CLIENT_ID \
+  --client-secret $FALCON_CLIENT_SECRET \
+  --type falcon-kac \
+  --list-tags
+```
+
+> **Unified vs. Regional images:** KAC >= 7.33 and IAR >= 1.0.24 use unified images that work across all regions from a single registry path (`registry.crowdstrike.com`). Older versions used region-specific tags. Use `--type falcon-kac-regional` or `--type falcon-imageanalyzer-regional` only if you need a version older than these thresholds.
+
+---
+
+### Option B: Mirror to a Private Registry
+
+For environments that require images to pass through an internal registry, use the `--copy` flag to pull from CrowdStrike and push directly to your registry. Skopeo is recommended for multi-arch images.
+
+**Mirror KAC:**
+
+```bash
+./falcon-container-sensor-pull.sh \
+  --client-id $FALCON_CLIENT_ID \
+  --client-secret $FALCON_CLIENT_SECRET \
+  --type falcon-kac \
+  --copy myregistry.example.com/crowdstrike \
+  --runtime skopeo
+```
+
+Result: `myregistry.example.com/crowdstrike/falcon-kac:<tag>`
+
+**Mirror IAR:**
+
+```bash
+./falcon-container-sensor-pull.sh \
+  --client-id $FALCON_CLIENT_ID \
+  --client-secret $FALCON_CLIENT_SECRET \
+  --type falcon-imageanalyzer \
+  --copy myregistry.example.com/crowdstrike \
+  --runtime skopeo
+```
+
+Result: `myregistry.example.com/crowdstrike/falcon-imageanalyzer:<tag>`
+
+After mirroring, set `image.repository` in your Helm values to the private registry path and supply your registry credentials via `image.registryConfigJSON`.
+
+---
+
 ## Step 1: Add the CrowdStrike Helm Repository
 
 ```bash
