@@ -9,7 +9,7 @@ This guide deploys two complementary CrowdStrike Falcon components to a Kubernet
 
 | Component | What It Does | Workload Type |
 |-----------|-------------|---------------|
-| **Falcon KAC** (Kubernetes Admission Controller) | Validates workloads at admission time, detects misconfigurations (IOMs), and can block non-compliant pods from being scheduled | Deployment (2 containers: webhook + controller) |
+| **Falcon KAC** (Kubernetes Admission Controller) | Validates workloads at admission time, detects misconfigurations (IOMs), and can block non-compliant pods from being scheduled | Deployment (3 containers: webhook, watcher, controller) |
 | **Falcon IAR** (Image Assessment at Runtime) | Scans container images running in the cluster and reports vulnerabilities to the Falcon console | Deployment — Watcher Mode (1 replica) |
 
 **Why Watcher Mode for IAR?**
@@ -293,7 +293,7 @@ kubectl get pods -n falcon-kac \
 kubectl logs -n falcon-kac -l app.kubernetes.io/name=falcon-kac -c falcon-ac
 ```
 
-**Expected:** One pod in `Running` state with 2 ready containers (`falcon-client` webhook and `falcon-ac` controller).
+**Expected:** One pod in `Running` state with 3 ready containers (`falcon-client` webhook, `falcon-watcher` resource watcher, and `falcon-ac` admission controller).
 
 ---
 
@@ -582,7 +582,7 @@ kubectl delete namespace falcon-kac
 
 | Resource | Namespace | Notes |
 |----------|-----------|-------|
-| KAC Deployment | `falcon-kac` | 1 pod, 2 containers (`falcon-client`, `falcon-ac`) |
+| KAC Deployment | `falcon-kac` | 1 pod, 3 containers (`falcon-client`, `falcon-watcher`, `falcon-ac`) |
 | KAC ValidatingWebhookConfiguration | cluster-scoped | Registered automatically; excludes `kube-system`, `kube-public`, `falcon-kac`, `falcon-system` |
 | IAR Deployment | `falcon-image-analyzer` | Always 1 replica in watcher mode |
 | IAR Agent Service | `falcon-image-analyzer` | Port 8001 — used by KAC for scan data requests |
