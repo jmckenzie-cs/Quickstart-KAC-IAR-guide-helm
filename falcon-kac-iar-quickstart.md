@@ -230,9 +230,11 @@ export CS_REGISTRY_TOKEN="your_crowdstrike_artifactory_token"
 
 ## Step 3: Apply Pod Security Standards (Kubernetes 1.25+)
 
+> **This step is conditional.** Pod Security Standards (PSS) enforcement is opt-in per namespace — most default EKS, AKS, and GKE clusters do not enforce PSS unless you have a cluster-wide default policy configured. Only apply these labels if your cluster enforces PSS or you are explicitly labeling namespaces as part of your security baseline.
+
 **KAC** runs all containers as non-root with no privilege escalation and no host access — it satisfies the `restricted` PSS profile in the default configuration (no `hostNetwork`).
 
-**IAR in watcher mode** runs as root (UID 0) and requires the `privileged` PSS label on its namespace.
+**IAR in watcher mode** runs as root (UID 0) and requires at minimum the `baseline` PSS profile. The official CrowdStrike documentation recommends `privileged`.
 
 ```bash
 # KAC namespace — restricted PSS is sufficient
@@ -242,7 +244,7 @@ kubectl label --overwrite ns falcon-kac \
   pod-security.kubernetes.io/warn=restricted \
   pod-security.kubernetes.io/audit=restricted
 
-# IAR namespace — privileged PSS required (runs as root)
+# IAR namespace — privileged PSS recommended (runs as root)
 kubectl create namespace falcon-image-analyzer --dry-run=client -o yaml | kubectl apply -f -
 kubectl label --overwrite ns falcon-image-analyzer \
   pod-security.kubernetes.io/enforce=privileged \
