@@ -147,7 +147,7 @@ Use the pull token output as `image.registryConfigJSON` in your Helm values.
 
 ### Option B: Mirror to a Private Registry
 
-For environments that require images to pass through an internal registry, use the `--copy` flag to pull from CrowdStrike and push directly to your registry. Skopeo is recommended for multi-arch images.
+Mirroring to a private registry is fully supported. Use the `--copy` flag to pull from the CrowdStrike registry and push directly to your internal registry in a single step. Registry credentials are retrieved automatically by the script using your Falcon API client ID and secret — no manual `docker login` required. Skopeo is recommended for multi-arch images.
 
 **Mirror KAC:**
 
