@@ -203,11 +203,11 @@ export FALCON_REGION="us-1"
 export FALCON_CLIENT_ID="your_oauth_client_id"
 export FALCON_CLIENT_SECRET="your_oauth_client_secret"
 
-# KAC image (from CrowdStrike registry or your mirror)
-# Tag format: <version>.container.x86_64.Release.<REGION>
-# Example: 7.33.0-1.container.x86_64.Release.US-1
+# KAC image — unified image (KAC >= 7.33), tag is just the version number
+# Use --get-image-path from falcon-container-sensor-pull.sh to get the exact tag
+# Regional format (< 7.33 only): <version>.container.x86_64.Release.<REGION>
 export KAC_IMAGE_REPO="registry.crowdstrike.com/falcon-kac/release/falcon-kac"
-export KAC_IMAGE_TAG="7.33.0-1.container.x86_64.Release.US-1"
+export KAC_IMAGE_TAG="7.33.0-1"
 
 # IAR image — region-specific registry path
 # US-1/US-2/EU-1: registry.crowdstrike.com
@@ -230,25 +230,27 @@ export CS_REGISTRY_TOKEN="your_crowdstrike_artifactory_token"
 
 ## Step 3: Apply Pod Security Standards (Kubernetes 1.25+)
 
-Both namespaces require `privileged` Pod Security Standards labels.
-IAR in watcher mode runs as root (UID 0) for image scanning.
-KAC requires privileged namespace access for the webhook containers.
+**KAC** runs all containers as non-root with no privilege escalation and no host access — it satisfies the `restricted` PSS profile in the default configuration (no `hostNetwork`).
+
+**IAR in watcher mode** runs as root (UID 0) and requires the `privileged` PSS label on its namespace.
 
 ```bash
-# KAC namespace
+# KAC namespace — restricted PSS is sufficient
 kubectl create namespace falcon-kac --dry-run=client -o yaml | kubectl apply -f -
 kubectl label --overwrite ns falcon-kac \
-  pod-security.kubernetes.io/enforce=privileged \
-  pod-security.kubernetes.io/warn=privileged \
-  pod-security.kubernetes.io/audit=privileged
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/warn=restricted \
+  pod-security.kubernetes.io/audit=restricted
 
-# IAR namespace
+# IAR namespace — privileged PSS required (runs as root)
 kubectl create namespace falcon-image-analyzer --dry-run=client -o yaml | kubectl apply -f -
 kubectl label --overwrite ns falcon-image-analyzer \
   pod-security.kubernetes.io/enforce=privileged \
   pod-security.kubernetes.io/warn=privileged \
   pod-security.kubernetes.io/audit=privileged
 ```
+
+> **Note:** If you enable `hostNetwork: true` on KAC (required for some custom CNI setups), upgrade the KAC namespace label to `privileged` as well.
 
 ---
 
@@ -282,7 +284,7 @@ helm upgrade --install falcon-kac crowdstrike/falcon-kac \
 ### 4c. Verify KAC Deployment
 
 ```bash
-# Check pod status — you should see 1 Running pod with 2 containers
+# Check pod status — you should see 1 Running pod with 3 containers
 kubectl get pods -n falcon-kac
 
 # Confirm running container image versions
@@ -573,7 +575,7 @@ kubectl delete namespace falcon-kac
 | IAR pod in `Pending` | Check node resources and `priorityClassName`; verify PSS labels on namespace |
 | IAR not scanning images | Confirm `deployment.enabled: true` and `daemonset.enabled: false`; check logs for auth errors |
 | No scan results in console | Verify `clientID`/`clientSecret` scopes include Falcon Container Image; check outbound firewall rules to upload servers |
-| KAC and IAR not communicating | Confirm IAR namespace matches `falconImageAnalyzerNamespace` in KAC values; verify IAR agent service is running on port 8001 |
+| KAC and IAR not communicating | Confirm IAR namespace matches `falconImageAnalyzerNamespace` in KAC values; verify IAR agent service is reachable on port 443 |
 | `clusterName` mismatch | Leave `clusterName` blank in IAR if KAC is running — KAC's discovered name takes precedence in the Falcon dashboard |
 
 ---
@@ -583,7 +585,7 @@ kubectl delete namespace falcon-kac
 | Resource | Namespace | Notes |
 |----------|-----------|-------|
 | KAC Deployment | `falcon-kac` | 1 pod, 3 containers (`falcon-client`, `falcon-watcher`, `falcon-ac`) |
-| KAC ValidatingWebhookConfiguration | cluster-scoped | Registered automatically; excludes `kube-system`, `kube-public`, `falcon-kac`, `falcon-system` |
+| KAC ValidatingWebhookConfiguration | cluster-scoped | Registered automatically; excludes `kube-system`, `kube-public`, `falcon-kac`, `falcon-system`, `falcon-kubernetes-protection` |
 | IAR Deployment | `falcon-image-analyzer` | Always 1 replica in watcher mode |
-| IAR Agent Service | `falcon-image-analyzer` | Port 8001 — used by KAC for scan data requests |
+| IAR Agent Service | `falcon-image-analyzer` | Exposes port 443 (→ container port 8001) — used by KAC for scan data requests |
 | IAR Temp Volume | `falcon-image-analyzer` | `emptyDir` 20Gi by default; holds extracted image layers during scanning |
